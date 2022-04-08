@@ -1,3 +1,5 @@
+#### This scripts identifies the most closely related reference sequence based on the results produced by run_blast.sh and uses it to iteratively call consensus sequence
+
 # software requirements:
 # seqtk
 # samtools-1.2
@@ -18,7 +20,6 @@ cat ${sample}.ref | sed 's/^/>/' > ${sample}.ref.fasta
 seqtk subseq ref_lanl.fasta ${sample}.ref | grep -v ">" | tr -d '\n' | sed 's/-//g' >> ${sample}.ref.fasta
 ref=${sample}.ref.fasta
 /home/tools/samtools/samtools-1.2/samtools faidx $ref
-
 
 
 # trim primers from reads; for this purpose, i'll map reads onto the reference genome (HXB2; K03455). Smalt mapping parameters should be softer!
@@ -51,6 +52,7 @@ python removeclipping.py -f ivar.sorted.bam ivar.sorted.clipped.bam
 reads1=r1.clipped.fastq
 reads2=r2.clipped.fastq
 
+# the reference sequence is a full-length genome; let's crop it to the region covered by reads
 smalt index -k 10 -s 3 ref $ref
 smalt map -o temp.bam -n 1 -i 1000 -x ref $reads1 $reads2
 /home/tools/samtools/samtools-1.2/samtools sort -m 10000000000 temp.bam temp.sorted
@@ -69,9 +71,12 @@ then
 
 /home/tools/bedtools/bedtools-2.29.2/bin/fastaFromBed -fi ${sample}.ref.fasta -bed ${sample}.0based.reg | sed 's/:.*//' > cropped.${sample}.fasta
 
+# $ref is the starting reference sequence used in the iterative calling procedure below
 ref=cropped.${sample}.fasta
 /home/tools/samtools/samtools-1.2/samtools faidx $ref
 
+
+# usually converges after 2 or 3 steps
 for iter in 1 2 3 4 5
 do
 
@@ -89,12 +94,11 @@ do
   /home/noraneko/Software/lofreq_star-2.1.5/bin/lofreq indelqual -f $ref -o iq.$viterbi --dindel $viterbi
   iq=iq.$viterbi
   /home/tools/samtools/samtools-1.2/samtools index $iq
-  #
-  #  #call variants using  min depth 2
+  
+  #call variants using  min depth 2
   vcf=$iter.lofreq.mindepth4.nofilt.vcf
   /home/noraneko/Software/lofreq_star-2.1.5/bin/lofreq call -f $ref -o $vcf -C 4 --call-indels --no-default-filter --force-overwrite --use-orphan $iq
   vars=$iter.lofreq.dp4.vars.vcf
-
 
   rm $vars
   /home/noraneko/Software/lofreq_star-2.1.5/bin/lofreq filter -Q 20 -K 20 --no-defaults -v 4 -V 0 -a 0.500001 -A 0 -i $vcf -o $vars
@@ -124,7 +128,7 @@ done
 
 cat $ref | sed "s/>.*/>$sample/" > consensus.fa
 
-cd ${sample}
+### we may also want to call ambiguous nucleotides
 mkdir call_ambiguous
 cd call_ambiguous
 cp ../consensus.fa .
@@ -135,11 +139,14 @@ vars=lofreq.dp4.vars.vcf
 rm $vars
 /home/noraneko/Software/lofreq_star-2.1.5/bin/lofreq filter -Q 20 -K 20 --only-snvs --no-defaults -v 4 -V 0 -a 0.2 -A 0 -i $vcf -o $vars
 cat $vars | grep -v "^#" | cut -f 2 | sort | uniq -c | grep -v "1 " | awk '{print $2}' > multiple_alleles.txt
-python ../../split_calls.py -i $vars -p multiple_alleles.txt -f $ref -o new_ref.fa
+
+# a custom python script that ..
+python ../split_calls.py -i $vars -p multiple_alleles.txt -f $ref -o new_ref.fa
+
 ref=new_ref.fa
 /home/tools/samtools/samtools-1.2/samtools faidx $ref
-smalt index -k 10 -s 3 ref $ref
-smalt map -o iter.bam -n 1 -i 1000 -x ref $reads1 $reads2
-/home/tools/samtools/samtools-1.2/samtools sort -m 10000000000 iter.bam iter.sorted
-/home/tools/samtools/samtools-1.2/samtools index iter.sorted.bam
-bam=iter.sorted.bam
+# smalt index -k 10 -s 3 ref $ref
+# smalt map -o iter.bam -n 1 -i 1000 -x ref $reads1 $reads2
+# /home/tools/samtools/samtools-1.2/samtools sort -m 10000000000 iter.bam iter.sorted
+# /home/tools/samtools/samtools-1.2/samtools index iter.sorted.bam
+# bam=iter.sorted.bam
