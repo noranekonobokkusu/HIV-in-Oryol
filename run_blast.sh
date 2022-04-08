@@ -1,4 +1,7 @@
 ### this script blasts trimmed paired Illumina reads against a set of reference HIV genomes lanl_refs.fasta (can be downloaded from https://www.hiv.lanl.gov/content/sequence/NEWALIGN/align.html)
+# software requirements:
+# blast-2.2.31
+# seqtk
 
 # create an indexed database for blastn
 /home/tools/blast-2.2.31/bin/makeblastdb -in lanl_refs.fasta -out lanl -dbtype 'nucl'
