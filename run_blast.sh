@@ -13,3 +13,4 @@ seqtk fq2fa ${sample}.R2.fq >> ${sample}.fasta
 
 # sort blastn results to include only one best hit per read, based on bitscore and evalue 
 sort -k1,1 -k13,13gr -k12,12g ${sample}.out | sort -u -k1,1 --merge > ${sample}.sorted.out
+
