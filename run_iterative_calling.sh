@@ -63,6 +63,8 @@ bam=temp.sorted.bam
 /home/tools/bedtools/bedtools-2.29.2/bin/mergeBed -i ${sample}.bed -d 100 | awk '{if ($3-$2>1000) print $0}' > ${sample}.reg
 cat ${sample}.reg | awk '{$2=$2-1; print $1"\t"$2"\t"$3}' > ${sample}.0based.reg
 nregions=`cat ${sample}.0based.reg | wc -l`
+
+# filter the required pol gene region, in case the regions outside the required fragment got non-zero coverage
 if (( $nregions > 1 ))
 then
    awk '{if ($3<3500) print $0}' ${sample}.0based.reg > temp
@@ -134,19 +136,12 @@ cd call_ambiguous
 cp ../consensus.fa .
 ref=consensus.fa
 /home/tools/samtools/samtools-1.2/samtools faidx $ref
+# take the vcf file from the latest iteration
 vcf=`ls -tr ../*.lofreq.mindepth4.nofilt.vcf | tail -n 1`
 vars=lofreq.dp4.vars.vcf
 rm $vars
+# filter minor variants at frequency of at least 20%
 /home/noraneko/Software/lofreq_star-2.1.5/bin/lofreq filter -Q 20 -K 20 --only-snvs --no-defaults -v 4 -V 0 -a 0.2 -A 0 -i $vcf -o $vars
-cat $vars | grep -v "^#" | cut -f 2 | sort | uniq -c | grep -v "1 " | awk '{print $2}' > multiple_alleles.txt
 
-# a custom python script that ..
-python ../split_calls.py -i $vars -p multiple_alleles.txt -f $ref -o new_ref.fa
-
-ref=new_ref.fa
-/home/tools/samtools/samtools-1.2/samtools faidx $ref
-# smalt index -k 10 -s 3 ref $ref
-# smalt map -o iter.bam -n 1 -i 1000 -x ref $reads1 $reads2
-# /home/tools/samtools/samtools-1.2/samtools sort -m 10000000000 iter.bam iter.sorted
-# /home/tools/samtools/samtools-1.2/samtools index iter.sorted.bam
-# bam=iter.sorted.bam
+# a custom python script that applies minor variants to produce a degenerate consensus
+python ../split_calls.py -i $vars -f $ref -o deg_ref.fa
