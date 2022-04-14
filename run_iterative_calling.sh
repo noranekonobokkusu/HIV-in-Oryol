@@ -144,4 +144,4 @@ rm $vars
 /home/noraneko/Software/lofreq_star-2.1.5/bin/lofreq filter -Q 20 -K 20 --only-snvs --no-defaults -v 4 -V 0 -a 0.2 -A 0 -i $vcf -o $vars
 
 # a custom python script that applies minor variants to produce a degenerate consensus
-python ../split_calls.py -i $vars -f $ref -o deg_ref.fa
+python ../call_degenerate_cons.py -i $vars -f $ref -o deg_ref.fa
